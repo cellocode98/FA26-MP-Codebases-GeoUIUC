@@ -5,13 +5,16 @@
 
 import styles from "./page.module.css";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from 'react';
 import SignOut from "@/components/SignoutButton";
 import DeleteAccount from "@/components/DeleteAccountButton";
 import {auth, db} from "../../components/firebase-config"
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from 'firebase/firestore'
 
 export default function Profile() {
+  const router = useRouter();
   const [profilePic, setProfilePic] = useState();
   const [name, setName] = useState();
   const [email, setEmail] = useState();
@@ -21,14 +24,18 @@ export default function Profile() {
     setProfilePic(localStorage.getItem("profilePic"));
     setName(localStorage.getItem("name"));
     setEmail(localStorage.getItem("email"));
-    const user = auth.currentUser 
-    const docRef = doc(db, "users", user.uid)
-    const updateSnap = async () => {
-      const docSnap = await getDoc(docRef);
+    // auth.currentUser is null until Firebase restores the session after a page load,
+    // so wait for the auth state instead of reading it right away.
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+      const docSnap = await getDoc(doc(db, "users", user.uid));
       setDocSnap(docSnap)
-    }
-    updateSnap()
-  }, []);
+    });
+    return () => unsub();
+  }, [router]);
 
 
   return (
